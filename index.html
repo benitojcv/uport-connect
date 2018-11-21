@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <script src="https://unpkg.com/uport-connect/dist/uport-connect.js"></script>
+    <script>
+            const Connect = window.uportconnect
+            const uport = new Connect('App 1 keypair account', {network: 'mainnet'})
+
+            function requestDisclosure() {
+                uport.requestDisclosure({
+                    requested: ['name', 'country'],
+                    notifications: true
+                })
+                uport.onResponse('disclosureReq').then(payload => {
+                    console.log(payload)
+                })
+            }
+
+            function createVerificationRequest() {
+                const unsignedClaim = {
+                    sub: 'did:ethr:0x413daa771a2fc9c5ae5a66abd144881ef2498c54',
+                    claim: {
+                        'citizen of cryptoville': {
+                        'allowed to vote': true,
+                        'document': 'QmZZBBKPS2NWc6PMZbUk9zUHCo1SHKzQPPX4ndfwaYzmPW',
+                        }
+                    }
+                }
+
+                uport.createVerificationRequest(unsignedClaim)
+
+                uport.onResponse('signClaimReq').then(payload => {
+                    console.log(payload)
+                    // do something with the signed credential
+                })
+            }
+    </script>
+</head>
+<body>
+    <input type="button" value="requestDisclosure" onclick="requestDisclosure()">
+    <input type="button" value="createVerificationRequest" onclick="createVerificationRequest()">
+</body>
+</html>
