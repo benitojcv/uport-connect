@@ -4,44 +4,173 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Document</title>
+    <title>uPort Demo</title>
+    <style>
+            table {
+                border-collapse: collapse;
+            }
+            
+            table, td, th {
+                border: 1px solid black;
+            }
+    </style>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <link rel="stylesheet" href="https://jqueryui.com//resources/demos/style.css">
+    <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script>
+        $( function() {
+            $( "#datepicker" ).datepicker();
+        } );
+    </script>
     <script src="https://unpkg.com/uport-connect/dist/uport-connect.js"></script>
     <script>
-            const Connect = window.uportconnect
-            const uport = new Connect('App 1 keypair account', {network: 'mainnet'})
+        var connectState
 
-            function requestDisclosure() {
-                uport.requestDisclosure({
-                    requested: ['name', 'country'],
-                    notifications: true
-                })
-                uport.onResponse('disclosureReq').then(payload => {
-                    console.log(payload)
-                })
-            }
+        function initialize() {
+            // initialize expiration field
+            document.getElementById('datepicker').value = (new Date()).toLocaleDateString("en-US")
 
-            function createVerificationRequest() {
-                const unsignedClaim = {
-                    sub: 'did:ethr:0x413daa771a2fc9c5ae5a66abd144881ef2498c54',
-                    claim: {
-                        'citizen of cryptoville': {
+            // remove local storage
+            // window.localStorage.clear()
+            uport.reset()
+
+            connectState = JSON.parse(JSON.parse(localStorage.getItem('connectState')))
+            document.getElementById('applicationdid').textContent = connectState.keypair.did
+            document.getElementById('applicationdprivatekey').textContent = connectState.keypair.privateKey
+        }
+
+        const Connect = window.uportconnect
+
+        // const uport = new Connect('App 1 keypair account', {network: 'mainnet'})
+        const uport = new Connect()
+
+        function requestDisclosure() {
+            uport.requestDisclosure({
+                requested: ['name', 'avatar', 'country', 'phone'],
+                notifications: document.getElementById("usepush").checked
+            })
+            uport.onResponse('disclosureReq').then(payload => {
+                const address = uport.address
+                const did = uport.did
+
+                console.log(payload)
+                document.getElementById('jsonresult').textContent = JSON.stringify(payload, null, 2);
+
+                //fill form
+                document.getElementById('userdid').value = payload.payload.did
+                document.getElementById('useravatar').src = payload.payload.avatar.uri
+                document.getElementById('username').value = payload.payload.name
+                document.getElementById('usercity').value = payload.payload.country
+                document.getElementById('userphone').value = payload.payload.phone
+            })
+        }
+
+        function sendVerification() {
+            const unsignedClaim = {
+                exp: Date.parse(document.getElementById('datepicker').value),
+                claim: {
+                    [document.getElementById('credential').value]: {
                         'allowed to vote': true,
-                        'document': 'QmZZBBKPS2NWc6PMZbUk9zUHCo1SHKzQPPX4ndfwaYzmPW',
-                        }
+                        'document': document.getElementById('documento').value,
                     }
                 }
-
-                uport.createVerificationRequest(unsignedClaim)
-
-                uport.onResponse('signClaimReq').then(payload => {
-                    console.log(payload)
-                    // do something with the signed credential
-                })
             }
+
+            document.getElementById('unsignedClaim').textContent = JSON.stringify(unsignedClaim, null, 2)
+
+            uport.sendVerification(unsignedClaim, 'REQUEST_ID')
+
+            uport.onResponse('REQUEST_ID').then(payload => {
+                console.log(payload)
+                // do something with the signed credential
+            })
+        }
+
+        function requestVerification() {
+            uport.requestDisclosure({
+                verified: [document.getElementById('credentialRequested').value]
+            })
+            uport.onResponse('disclosureReq').then(payload => {
+                const address = uport.address
+                const did = uport.did
+
+                console.log(payload)
+                document.getElementById('requestVerificationResponse').textContent = JSON.stringify(payload, null, 2);
+            })
+        }
+
+        function requestVerificationSignature() {
+            const unsignedClaim = {
+                claim: JSON.parse(document.getElementById('claimtosign').value),
+            }
+            uport.requestVerificationSignature(unsignedClaim, document.getElementById('userdid').value, 'idverifsign')
+
+            uport.onResponse('idverifsign').then(jwt => {
+                console.log('jwt:', jwt)
+                document.getElementById('requestVerificationSignatureResponse').textContent = JSON.stringify(jwt, null, 2)
+            })
+        }
     </script>
 </head>
-<body>
+<body onload="initialize()">
+    did: <div id="applicationdid"></div><br/>
+    privatekey: <div id="applicationdprivatekey"></div><br/>
     <input type="button" value="requestDisclosure" onclick="requestDisclosure()">
-    <input type="button" value="createVerificationRequest" onclick="createVerificationRequest()">
+    <input type="checkbox" id="usepush" checked> Usar Push<br>
+    <table>
+        <tr>
+            <td>
+                <form>
+                    <image src="" id="useravatar"/><br>
+                    DID: <input id="userdid" type="text"/><br/> 
+                    Nombre: <input id="username" type="text"/><br/>
+                    Ciudad: <input id="usercity" type="text"/><br/>
+                    Teléfono: <input id="userphone" type="text"/><br/>
+                </form>                                    
+            </td>
+            <td>
+                <pre><div id="jsonresult"></div></pre>                    
+            </td>
+        </tr>
+        <tr>
+            <td>
+                Credential: <input id="credential" type="text" value="Open Canarias"/><br/>
+                Expiration: <input type="text" id="datepicker" value=""><br/>
+                Document: <input type="text" id="documento" value="documento"><br/>
+                <br/><br/>
+                <input type="button" value="sendVerification" onclick="sendVerification()">
+            </td>
+            <td>
+                    <pre><div id="unsignedClaim"></div></pre>                            
+            </td>
+        </tr>
+        <tr>
+            <td>
+                    Credential: <input id="credentialRequested" type="text" value="Open Canarias"/><br/>
+                    <input type="button" value="requestVerification" onclick="requestVerification()">
+            </td>
+            <td>
+                    <pre><div id="requestVerificationResponse"></div></pre>                            
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <textarea id="claimtosign" rows="10" cols="50">
+{
+    "AAA": {
+        "allowed to vote": false,
+        "document": "datos a firmar"
+    }
+}
+                </textarea><br/>
+                <input type="button" value="requestVerificationSignature" onclick="requestVerificationSignature()">
+            </td>
+            <td>
+                <pre><div id="requestVerificationSignatureResponse"></div></pre>                            
+            </td>
+        </tr>
+    </table>
+
 </body>
 </html>
